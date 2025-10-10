@@ -1,3 +1,6 @@
 gunicorn
 flask
 python-dotenv
+lxml
+beautifulsoup4
+requests
