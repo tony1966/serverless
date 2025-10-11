@@ -4,3 +4,7 @@ python-dotenv
 lxml
 beautifulsoup4
 requests
+line-bot-sdk
+python-telegram-bot
+google-generativeai
+openai
