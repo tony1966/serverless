@@ -68,7 +68,7 @@ PROTECTED_FUNCTIONS=['list_functions',
 # 根目錄
 @app.route("/")
 def index():
-    return '<p>Serverless API 運行中! <a href="/function/list_functions">函式列表</a></p>'
+    return '<p>Serverless API 運行中! <a href="/function/login">登入</a></p>'
 
 # 登入管理功能
 @app.route('/login', methods=['GET', 'POST'])
