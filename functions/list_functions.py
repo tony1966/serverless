@@ -28,6 +28,7 @@ def main(request, **kwargs):
         html += f'</tr>'
     html += '</table>'
     html += '<br><a href="/function/add_function">新增函式</a> '
-    html += '<a href="/function/show_stats">呼叫統計</a> '    
+    html += '<a href="/function/show_stats">呼叫統計</a> '
+    html += '<a href="/function/list_tables">資料表</a> '    
     html += '<a href="/logout">登出</a>'
     return html
