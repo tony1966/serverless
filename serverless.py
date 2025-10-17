@@ -1,5 +1,5 @@
 # serverless.py
-from flask import Flask, request, jsonify, session  
+from flask import Flask, request, jsonify, session, redirect, url_for
 import importlib.util
 import os
 import logging
@@ -26,7 +26,7 @@ def init_db():  # 初始化呼叫紀錄資料庫
         conn.close()
 
 def record_call(func_name):  # 紀錄函式呼叫次數
-    if not os.path.exists(DB_PATH):  # 若資料庫檔不存在就建立
+    if not os.path.exists(DB_PATH):  # 若資料庫檔不存在就建立 
         init_db()    
     try:
         conn=sqlite3.connect(DB_PATH)
@@ -44,7 +44,7 @@ def record_call(func_name):  # 紀錄函式呼叫次數
 
 app=Flask(__name__)
 # 初始化資料庫
-init_db()
+init_db()  
 # 從 .env 讀取權杖 (密碼) 與金鑰
 config=dotenv_values('.env')
 SECRET_TOKEN=config.get('SECRET_TOKEN')  # 易記的令牌 (類似密碼)
@@ -68,7 +68,10 @@ PROTECTED_FUNCTIONS=['list_functions',
 # 根目錄
 @app.route("/")
 def index():
-    return '<p>Serverless API 運行中! <a href="/login">登入系統</a></p>'
+    if check_auth(): # 若已登入導向函式列表頁面        
+        return redirect(url_for("list_functions"))
+    else:  # 否則顯示登入提示        
+        return '<p>Serverless API 運行中! <a href="/login">登入系統</a></p>' 
 
 # 登入管理功能
 @app.route('/login', methods=['GET', 'POST'])
@@ -149,4 +152,3 @@ def handle_function(func_name, subpath):  # 傳入 subpath 支援 RESTful
 if __name__ == '__main__':
     init_db()  # 初始化資料庫
     app.run(debug=True)
-
