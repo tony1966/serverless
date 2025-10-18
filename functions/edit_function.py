@@ -2,6 +2,7 @@
 # 模組名稱也可更改 -> 相當於新增模組
 from flask import render_template_string
 import os
+from html import escape
 
 def main(request, **kwargs):
     module_name=request.args.get('module_name', '')  # 取得模組名稱
@@ -12,6 +13,7 @@ def main(request, **kwargs):
         return f'找不到函式檔案：{module_name}'
     with open(filename, 'r', encoding='utf-8') as f: 
         content=f.read()  # 讀取模組內容
+        content=escape(content)
     html=f'''
     <h2>編輯函式模組：/functions/{module_name}.py</h2>
     <form method="POST" action="/function/update_function">
