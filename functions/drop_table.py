@@ -20,7 +20,7 @@ def main(request, **kwargs):
     protected=['call_stats']
     if table in protected:
         return f'''
-            <p>資料表 {table} 為保護表，無法刪除！
+            <p>資料表 {table} 為系統資料表，無法刪除！
             <a href="/function/list_tables">返回列表</a></p>
             '''
     try:
