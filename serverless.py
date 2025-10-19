@@ -67,7 +67,7 @@ PROTECTED_FUNCTIONS=['list_functions',
                      'add_table',
                      'drop_table',
                      'view_table'.
-                     'show_shema',
+                     'show_schema',
                      'export_table',
                      'execute_sql',
                      'delete_record'
