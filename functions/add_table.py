@@ -18,7 +18,6 @@ def main(request, **kwargs):
             "required></textarea><br><br>"
             "<input type='submit' value='建立資料表'>"
             "</form>"
-            "<br>"
             "<a href='/function/list_tables'>返回資料表列表</a>"
             )
         return html

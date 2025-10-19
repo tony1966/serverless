@@ -2,7 +2,7 @@
 import os
 import sqlite3
 import html
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 def main(request, **kwargs):
     # 解析 URL 查詢參數 (?table=xxx&page=1)
@@ -20,14 +20,11 @@ def main(request, **kwargs):
     # 檢查資料庫是否存在
     if not os.path.exists(DB_PATH):
         return '''
-        <p>資料庫檔案 serverless.db 不存在！
-        <a href="/function/list_tables">返回資料表列表</a></p>
+        <p>資料庫檔案 serverless.db 不存在！<a href="/function/list_tables">返回資料表列表</a></p>
         '''
-    # 檢查 URL 參數中是否有 table 名稱
     if not table:
         return '''
-        <p>缺少 table 參數！
-        <a href="/function/list_tables">返回資料表列表</a></p>
+        <p>缺少 table 參數！<a href="/function/list_tables">返回資料表列表</a></p>
         '''
     try:
         conn=sqlite3.connect(DB_PATH)
@@ -52,18 +49,29 @@ def main(request, **kwargs):
         cur.execute(f'SELECT * FROM "{table}" LIMIT ? OFFSET ?;', (ROWS_PER_PAGE, offset))
         rows=cur.fetchall()
         conn.close()
+
         # 組成 HTML
         text=f'<h2>資料表 {html.escape(table)} 內容</h2>'
         text += '<table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse;">'
         # 欄位列
         if colnames:
-            text += '<tr>' + ''.join(f'<th>{html.escape(c)}</th>' for c in colnames) + '</tr>'
+            text += '<tr>'
+            text += ''.join(f'<th>{html.escape(c)}</th>' for c in colnames)
+            text += '<th>刪除</th>'  # 新增刪除欄位
+            text += '</tr>'
         else:
             text += '<tr><td colspan="99">（無欄位）</td></tr>'
         # 資料列
         if rows:
             for row in rows:
-                text += '<tr>' + ''.join(f'<td>{html.escape(str(v))}</td>' for v in row) + '</tr>'
+                text += '<tr>'
+                for v in row:
+                    text += f'<td>{html.escape(str(v))}</td>'
+                # 假設第一個欄位是主鍵
+                pk_value = quote(str(row[0]))
+                text += f'<td><a href="/function/delete_record?table={quote(table)}&pk={pk_value}" ' \
+                        f'onclick="return confirm(\'確定要刪除此筆紀錄嗎？\')">刪除</a></td>'
+                text += '</tr>'
         else:
             text += '<tr><td colspan="99">（本頁無資料）</td></tr>'
         text += '</table>'
@@ -71,9 +79,9 @@ def main(request, **kwargs):
         text += f'<p>共 {total_rows} 筆資料，頁 {page}/{total_pages}</p>'
         text += '<div style="margin:10px 0;">'
         if page > 1:
-            text += f'<a href="/function/view_table?table={html.escape(table)}&page={page-1}">上一頁</a> '
+            text += f'<a href="/function/view_table?table={quote(table)}&page={page-1}">上一頁</a> '
         if page < total_pages:
-            text += f'<a href="/function/view_table?table={html.escape(table)}&page={page+1}">下一頁</a>'
+            text += f'<a href="/function/view_table?table={quote(table)}&page={page+1}">下一頁</a>'
         text += '</div>'
         text += '<a href="/function/list_tables">返回資料表列表</a>'
         return text

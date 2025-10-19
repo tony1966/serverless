@@ -2,6 +2,7 @@
 import os
 import sqlite3
 from flask import request, redirect
+from urllib.parse import parse_qs
 
 def main(request, **kwargs):
     # 解析 URL 參數取得資料表名稱

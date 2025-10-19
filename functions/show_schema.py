@@ -59,7 +59,7 @@ def main(request, **kwargs):
         html += '<h3>CREATE TABLE SQL 語法</h3>'
         html += f'<pre style="background-color:#f4f4f4;padding:10px;">{create_sql}</pre>'
         # 導覽連結
-        html += '<br><a href="/function/list_tables">返回資料表列表</a>'
+        html += '<a href="/function/list_tables">返回資料表列表</a>'
         return html
     except sqlite3.Error as e:
         return f'<p>讀取資料表結構失敗：{str(e)}</p>'

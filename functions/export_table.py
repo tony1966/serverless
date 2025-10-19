@@ -40,8 +40,9 @@ def main(request, **kwargs):
         csv_data=output.getvalue()
         output.close()
         # 回傳 CSV 給瀏覽器下載
+        csv_bytes=csv_data.encode('utf-8-sig')        
         return Response(
-            csv_data,
+            csv_bytes,
             mimetype='text/csv',
             headers={'Content-Disposition': f'attachment; filename="{table}.csv"'}
             )   
