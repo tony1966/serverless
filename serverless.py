@@ -1,5 +1,5 @@
 # serverless.py
-from flask import Flask, request, jsonify, session, redirect, url_for
+from flask import Flask, request, jsonify, session, redirect
 import importlib.util
 import os
 import logging
@@ -62,14 +62,22 @@ PROTECTED_FUNCTIONS=['list_functions',
                      'update_function',
                      'delete_function',
                      'show_stats',
-                     'clear_stats'
+                     'clear_stats',
+                     'list_tables',
+                     'add_table',
+                     'drop_table',
+                     'view_table'.
+                     'show_shema',
+                     'export_table',
+                     'execute_sql',
+                     'delete_record'
                      ]
 
 # 根目錄
 @app.route("/")
 def index():
     if check_auth(): # 若已登入導向函式列表頁面        
-        return redirect(url_for("list_functions"))
+        return redirect('/function/list_functions')
     else:  # 否則顯示登入提示        
         return '<p>Serverless API 運行中! <a href="/login">登入系統</a></p>' 
 
@@ -147,9 +155,8 @@ def handle_function(func_name, subpath):  # 傳入 subpath 支援 RESTful
         return result 
     except Exception as e:
         logging.exception(f'Error in function {func_name}\n{e}')  # 紀錄錯誤於日誌
-        return jsonify({'error': f'Function execution failed : {e}'}), 500
+        return jsonify({'error': 'Function execution failed'}), 500
 
 if __name__ == '__main__':
     init_db()  # 初始化資料庫
-
     app.run(debug=True)
