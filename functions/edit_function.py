@@ -14,7 +14,7 @@ def main(request, **kwargs):
     with open(filename, 'r', encoding='utf-8') as f: 
         content=f.read()  # 讀取模組內容
         content=escape(content)
-    html=f'''
+    text=f'''
     <h2>編輯函式模組：/functions/{module_name}.py</h2>
     <form method="POST" action="/function/update_function">
         <label>模組名稱（請用英數字，不含副檔名 .py）:</label><br>    
@@ -26,4 +26,5 @@ def main(request, **kwargs):
         <button type="submit">更新</button>
     </form>
     '''
-    return render_template_string(html)
+
+    return render_template_string(text)
