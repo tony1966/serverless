@@ -155,8 +155,9 @@ def handle_function(func_name, subpath):  # 傳入 subpath 支援 RESTful
         return result 
     except Exception as e:
         logging.exception(f'Error in function {func_name}\n{e}')  # 紀錄錯誤於日誌
-        return jsonify({'error': 'Function execution failed'}), 500
+        return jsonify({'error': 'Function execution failed : ' + e}), 500
 
 if __name__ == '__main__':
     init_db()  # 初始化資料庫
+
     app.run(debug=True)
