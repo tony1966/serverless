@@ -66,7 +66,8 @@ def main(request, **kwargs):
             for row in rows:
                 text += '<tr>'
                 for v in row:
-                    text += f'<td>{html.escape(str(v)).replace("\n", "<br>")}</td>'
+                    html_nl2br=html.escape(str(v)).replace("\n", "<br>")
+                    text += f'<td>{html_nl2br}</td>'
                 # 假設第一個欄位是主鍵
                 pk_value = quote(str(row[0]))
                 text += f'<td><a href="/function/delete_record?table={quote(table)}&pk={pk_value}" ' \
@@ -90,3 +91,4 @@ def main(request, **kwargs):
     finally:
         if 'conn' in locals():
             conn.close()
+
