@@ -66,7 +66,7 @@ def main(request, **kwargs):
             for row in rows:
                 text += '<tr>'
                 for v in row:
-                    text += f'<td>{html.escape(str(v))}</td>'
+                    text += f'<td>{html.escape(str(v)).replace("\n", "<br>")}</td>'
                 # 假設第一個欄位是主鍵
                 pk_value = quote(str(row[0]))
                 text += f'<td><a href="/function/delete_record?table={quote(table)}&pk={pk_value}" ' \
