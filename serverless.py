@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, session, redirect
 import importlib.util
 import os
 import logging
+from functools import wraps
 from dotenv import dotenv_values
 import sqlite3
 
@@ -12,18 +13,28 @@ DB_PATH='./serverless.db'
 def check_auth():  # 檢查使用者是否已登入
     return session.get('authenticated') == True
 
-def init_db():  # 初始化呼叫紀錄資料庫
-    if not os.path.exists(DB_PATH):
-        conn=sqlite3.connect(DB_PATH)
-        cursor=conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS call_stats (
-                func_name TEXT PRIMARY KEY,
-                call_count INTEGER NOT NULL
-                )
-            """)
-        conn.commit()
-        conn.close()
+def init_db():  # 初始化資料庫（冪等，每次啟動皆執行）
+    conn=sqlite3.connect(DB_PATH)
+    cursor=conn.cursor()
+    # 呼叫統計表
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS call_stats (
+            func_name TEXT PRIMARY KEY,
+            call_count INTEGER NOT NULL
+        )
+    """)
+    # API Token 認證表
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS api_tokens (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            token      TEXT    NOT NULL UNIQUE,
+            owner      TEXT    NOT NULL,
+            is_active  INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 def record_call(func_name):  # 紀錄函式呼叫次數
     if not os.path.exists(DB_PATH):  # 若資料庫檔不存在就建立 
@@ -42,6 +53,25 @@ def record_call(func_name):  # 紀錄函式呼叫次數
     except Exception as e:
         logging.error(f'Failed to record call stats for {func_name}: {e}')
 
+def require_api_token(f):  # 裝飾器：驗證請求 Header 中的 X-API-Key
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token=request.headers.get('X-API-Key')
+        if not token:  # Header 遺失
+            return jsonify({'error': 'Missing API token', 'hint': 'Provide X-API-Key header'}), 401
+        conn=sqlite3.connect(DB_PATH)
+        cursor=conn.cursor()
+        cursor.execute(
+            'SELECT id FROM api_tokens WHERE token=? AND is_active=1',
+            (token,)
+        )
+        row=cursor.fetchone()
+        conn.close()
+        if not row:  # Token 不存在或已停用
+            return jsonify({'error': 'Invalid or inactive API token'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
 app=Flask(__name__)
 # 初始化資料庫
 init_db()  
@@ -54,7 +84,7 @@ app.secret_key=SECRET_KEY  # 用來簽章與驗證 session cookie
 FUNCTIONS_DIR=os.path.expanduser('./functions')
 # 指定錯誤日誌檔 (在目前工作目錄下)
 logging.basicConfig(filename='serverless_error.log', level=logging.ERROR)
-# 需要驗證的函式列表
+# 需要 Session 驗證的管理函式列表
 PROTECTED_FUNCTIONS=['list_functions',
                      'add_function',
                      'save_function',
@@ -72,6 +102,7 @@ PROTECTED_FUNCTIONS=['list_functions',
                      'execute_sql',
                      'delete_record'
                      ]
+# 授權方式：Session 登入（管理者）或有效 API Token，擇一通過即可
 
 # 根目錄
 @app.route("/")
@@ -129,35 +160,51 @@ def logout():
 @app.route('/function/<func_name>', defaults={'subpath': ''}, methods=['GET', 'POST'])
 @app.route('/function/<func_name>/<path:subpath>', methods=['GET', 'POST'])
 def handle_function(func_name, subpath):  # 傳入 subpath 支援 RESTful
-    # 1. 如果呼叫管理模組必須使用者已登入才行
-    if func_name in PROTECTED_FUNCTIONS and not check_auth():
-        return jsonify({'error': 'Authentication required', 'login_url': '/login'}), 401    
-    # 2. 取得檔案路徑
+    # 1. 統一授權驗證：Session 登入 OR 有效 API Token，擇一通過
+    is_session_auth=check_auth()  # 確認 Session 狀態
+    is_token_auth=False
+    if not is_session_auth:  # 無 Session 時，嘗試 API Token 驗證
+        api_token=request.headers.get('X-API-Key')
+        if api_token:
+            conn=sqlite3.connect(DB_PATH)
+            cursor=conn.cursor()
+            cursor.execute(
+                'SELECT id FROM api_tokens WHERE token=? AND is_active=1',
+                (api_token,)
+            )
+            is_token_auth=cursor.fetchone() is not None
+            conn.close()
+    is_authorized=is_session_auth or is_token_auth
+    # 2. 管理模組：需要授權（Session 或 Token）
+    if func_name in PROTECTED_FUNCTIONS and not is_authorized:
+        return jsonify({'error': 'Authentication required', 'login_url': '/login'}), 401
+    # 3. 一般函式：同樣需要授權
+    if func_name not in PROTECTED_FUNCTIONS and not is_authorized:
+        return jsonify({'error': 'Missing API token', 'hint': 'Provide X-API-Key header'}), 401
+    # 4. 取得檔案路徑
     func_path=os.path.join(FUNCTIONS_DIR, f'{func_name}.py')
     if not os.path.isfile(func_path):  # 模組檔案不存在 -> 回 404
         return jsonify({'error': f'Function "{func_name}" not found'}), 404
     try:
-        # 3. 動態載入模組 (絕對路徑)
+        # 5. 動態載入模組 (絕對路徑)
         spec=importlib.util.spec_from_file_location(func_name, func_path)
         module=importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        # 4. 檢查模組中有無 main() 函式 :
+        # 6. 檢查模組中有無 main() 函式 :
         if not hasattr(module, 'main'):  # 模組中無 main() 函式
             return jsonify({'error': f'Module "{func_name}" has no main()'}), 400
-        # 5. 將 subpath 加入 request 中 (支援 RESTful)
+        # 7. 將 subpath 加入 request 中 (支援 RESTful)
         request.view_args['subpath']=subpath
-        # 6. 記錄呼叫統計 (除了統計查詢自身避免無限循環)
+        # 8. 記錄呼叫統計 (除了統計查詢自身避免無限循環)
         if func_name not in PROTECTED_FUNCTIONS:
             record_call(func_name)        
-        # 7. 執行模組中的函式 (傳入模組可能需要的參數-但不一定會用到) :        
+        # 9. 執行模組中的函式 (傳入模組可能需要的參數-但不一定會用到) :        
         result=module.main(request, config=config, protected=PROTECTED_FUNCTIONS)
-        # 8. 傳回函式執行結果
+        # 10. 傳回函式執行結果
         return result 
     except Exception as e:
         logging.exception(f'Error in function {func_name}\n{e}')  # 紀錄錯誤於日誌
         return jsonify({'error': 'Function execution failed : ' + e}), 500
 
 if __name__ == '__main__':
-    init_db()  # 初始化資料庫
-
     app.run(debug=True)
